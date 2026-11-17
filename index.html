@@ -463,6 +463,20 @@ body{display:flex; flex-direction:column; overflow:hidden}
 .side .newsbox ul{gap:5px}
 .side .newsbox li{font-size:.88rem; line-height:1.3}
 .side .board ol{max-height:26vh}
+
+/* ===== ألوان المستويات ===== */
+.easy{--c:#16844A; --t:#E4F6EB} .mid{--c:#A85F00; --t:#FFF3DC} .hard{--c:#C23A3A; --t:#FCE9E9}
+.lvbtn{border-color:var(--c); background:var(--t); position:relative; overflow:hidden}
+.lvbtn::before{content:""; position:absolute; inset-inline:0; top:0; height:8px; background:var(--c)}
+.lvbtn .ln{color:var(--c)}
+.lvbtn .la{color:var(--ink)}
+.lvchip{background:var(--c,var(--navy))}
+.fld .lvl{display:flex; align-items:center; gap:8px; color:var(--c)}
+.fld .lvl::before{content:""; width:12px; height:12px; border-radius:50%; background:var(--c)}
+.seg button.on:not(.buy):not(.sell){background:var(--navy); color:#fff}
+#lSeg{align-self:flex-start}
+.fld.wide{grid-column:1/-1}
+#lSeg button{white-space:nowrap}
 </style>
 </head>
 <body>
@@ -487,8 +501,13 @@ body{display:flex; flex-direction:column; overflow:hidden}
 const KEY = "saqeel-stock-market-v2";
 const MAX_MOVES = 2;
 const MIN_G = 2, MAX_G = 20;
-const MAX_LV = 6;
-const DEFAULT_CFG = {cash:2000, levels:3, rewards:[100,200,300,400,500,600], qTime:60, mTime:90};
+const MAX_LV = 3;
+const DEFAULT_CFG = {cash:2000, levels:3, rewards:[100,200,300], qTime:60, mTime:90};
+/* مستويان أو ثلاثة، وتسميتها بحسب الصعوبة تلقائيًا مع لون لكل مستوى */
+const LV_NAMES = {2:["سهل","صعب"], 3:["سهل","متوسط","صعب"]};
+const LV_CLS = {2:["easy","hard"], 3:["easy","mid","hard"]};
+const lvName = (n,i) => (LV_NAMES[n]||[])[i] || "المستوى "+(i+1);
+const lvCls = (n,i) => (LV_CLS[n]||[])[i] || "mid";
 const COMPANIES = [
   {id:"transport", name:"المواصلات", ic:`<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="13" rx="2.5"/><path d="M4 11h16"/><circle cx="8.5" cy="19.5" r="1.3"/><circle cx="15.5" cy="19.5" r="1.3"/></svg>`, price:85},
   {id:"power",     name:"الكهرباء",  ic:`<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 5 14h6l-1 8 8-12h-6z"/></svg>`, price:120},
@@ -756,7 +775,7 @@ function nameFields(n){
 }
 function rewardFields(){
   let f = "";
-  for(let i=0;i<UI.cfg.levels;i++) f += `<label class="fld"><span>المستوى <span class="num">${i+1}</span></span><input data-lv="${i}" class="num" type="number" min="10" step="10" inputmode="numeric" value="${UI.cfg.rewards[i]}"></label>`;
+  for(let i=0;i<UI.cfg.levels;i++) f += `<label class="fld"><span class="lvl ${lvCls(UI.cfg.levels,i)}">${lvName(UI.cfg.levels,i)}</span><input data-lv="${i}" class="num" type="number" min="10" step="10" inputmode="numeric" value="${UI.cfg.rewards[i]}"></label>`;
   return f;
 }
 function renderSetup(){
@@ -779,10 +798,7 @@ function renderSetup(){
     <h3 class="sec">الرصيد والمكافآت</h3>
     <div class="cfg-grid">
       <label class="fld"><span>الرصيد الافتتاحي (ريال)</span><input id="cCash" class="num" type="number" min="100" step="100" inputmode="numeric" value="${c.cash}"></label>
-      <div class="fld"><span>عدد مستويات الأسئلة</span>
-        <div class="stepper"><button id="lMinus" aria-label="إنقاص المستويات">−</button>
-        <input id="lCnt" class="num" type="number" min="1" max="${MAX_LV}" value="${c.levels}" readonly>
-        <button id="lPlus" aria-label="زيادة المستويات">+</button></div></div>
+      <div class="fld wide"><span>عدد مستويات الأسئلة</span><div class="seg" id="lSeg"><button data-n="2">مستويان</button><button data-n="3">ثلاثة مستويات</button></div></div>
     </div>
     <p class="sub">المبلغ الممنوح عن كل إجابة صحيحة في كل مستوى (ريال)</p>
     <div class="cfg-grid" id="lvGrid">${rewardFields()}</div>
@@ -811,17 +827,14 @@ function renderSetup(){
   const setCount = v => { UI.setupCount = clamp(Math.floor(+v)||MIN_G, MIN_G, MAX_G); refreshNames(); };
   const bindRewards = () => app.querySelectorAll("#lvGrid input").forEach(inp => inp.oninput = e => UI.cfg.rewards[+e.target.dataset.lv] = Math.floor(+e.target.value)||0);
   const setLevels = v => {
-    UI.cfg.levels = clamp(Math.floor(+v)||1, 1, MAX_LV);
-    app.querySelector("#lCnt").value = UI.cfg.levels;
-    app.querySelector("#lMinus").disabled = UI.cfg.levels<=1;
-    app.querySelector("#lPlus").disabled = UI.cfg.levels>=MAX_LV;
+    UI.cfg.levels = v===2 ? 2 : 3;
+    app.querySelectorAll("#lSeg button").forEach(b => b.classList.toggle("on", +b.dataset.n===UI.cfg.levels));
     app.querySelector("#lvGrid").innerHTML = rewardFields(); bindRewards();
   };
   app.querySelector("#cMinus").onclick = () => setCount(UI.setupCount-1);
   app.querySelector("#cPlus").onclick = () => setCount(UI.setupCount+1);
   app.querySelector("#cnt").onchange = e => setCount(e.target.value);
-  app.querySelector("#lMinus").onclick = () => setLevels(UI.cfg.levels-1);
-  app.querySelector("#lPlus").onclick = () => setLevels(UI.cfg.levels+1);
+  app.querySelectorAll("#lSeg button").forEach(b => b.onclick = () => setLevels(+b.dataset.n));
   app.querySelector("#cCash").oninput = e => UI.cfg.cash = Math.floor(+e.target.value)||0;
   app.querySelector("#cQ").oninput = e => UI.cfg.qTime = Math.floor(+e.target.value)||0;
   app.querySelector("#cM").oninput = e => UI.cfg.mTime = Math.floor(+e.target.value)||0;
@@ -841,7 +854,7 @@ function renderSetup(){
 
 function showHow(){
   const root = document.getElementById("modalRoot"), c = S ? S.cfg : UI.cfg;
-  const rw = c.rewards.slice(0,c.levels).map((a,i)=>`المستوى <span class="num">${i+1}</span>: <span class="num">${fmt(a)}</span>`).join(" • ");
+  const rw = c.rewards.slice(0,c.levels).map((a,i)=>`${lvName(c.levels,i)}: <span class="num">${fmt(a)}</span>`).join(" • ");
   const tm = x => x ? `<span class="num">${x}</span> ثانية` : "بلا وقت";
   root.innerHTML = `<div class="modal-bg" role="dialog" aria-modal="true"><div class="modal how">
     <h4>طريقة اللعب</h4>
@@ -909,14 +922,14 @@ function stageQuestion(){
   const head = `${metaLine()}${orderStrip()}<div class="team-name">${esc(t.name)}</div>`;
   const bal = `<div><div class="bal-label">الرصيد الحالي</div><div class="bal"><span class="num">${fmt(wealth(t))}</span>${RIYAL}</div></div>`;
   if(lv==null){
-    const btns = c.rewards.map((amt,i)=>`<button class="lvbtn" data-lv="${i}"><span class="ln">المستوى <span class="num">${i+1}</span></span><span class="la">+<span class="num">${fmt(amt)}</span> <small>ريال</small></span></button>`).join("");
+    const btns = c.rewards.map((amt,i)=>`<button class="lvbtn ${lvCls(c.levels,i)}" data-lv="${i}"><span class="ln">${lvName(c.levels,i)}</span><span class="la">+<span class="num">${fmt(amt)}</span> <small>ريال</small></span></button>`).join("");
     return `${head}<div class="qrow">${bal}</div>
       <div class="pick-title">اختاروا مستوى السؤال${c.qTime?` <small>ويبدأ العداد فور الاختيار (<span class="num">${c.qTime}</span> ثانية)</small>`:""}</div>
       <div class="lv-btns">${btns}</div>`;
   }
   const expired = !!(c.qTime && curTimer("q").expired);
   return `${head}
-    <div class="qrow">${bal}<div class="lvchip">المستوى <span class="num">${lv+1}</span> • +<span class="num">${fmt(c.rewards[lv])}</span> ريال</div></div>
+    <div class="qrow">${bal}<div class="lvchip ${lvCls(c.levels,lv)}">${lvName(c.levels,lv)} • +<span class="num">${fmt(c.rewards[lv])}</span> ريال</div></div>
     ${timerHtml("q")}
     <div class="answer-btns two">
       <button class="abtn ok" id="aOk" ${expired?"disabled":""}><i>✓</i> إجابة صحيحة</button>
@@ -933,7 +946,7 @@ function stageReward(){
   return `${metaLine()}${orderStrip()}
     <div class="team-name" style="font-size:clamp(2rem,4vw,3rem)">${esc(t.name)}</div>
     <div class="reward">
-      <div class="label">${r.correct?`مكافأة سؤال المستوى <span class="num">${r.level}</span>`:"إجابة خاطئة"}</div>
+      <div class="label">${r.correct?`مكافأة سؤال ${lvName(S.cfg.levels, r.level-1)}`:"إجابة خاطئة"}</div>
       ${amtHtml}
       <div class="newbal">الرصيد الآن: <b class="num" id="rBal">${fmt(anim ? wealth(t)-r.amt : wealth(t))}</b> ريال</div>
     </div>
