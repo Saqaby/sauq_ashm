@@ -477,6 +477,7 @@ body{display:flex; flex-direction:column; overflow:hidden}
 #lSeg{align-self:flex-start}
 .fld.wide{grid-column:1/-1}
 #lSeg button{white-space:nowrap}
+.one{--c:#1B4785; --t:#EAF3FB}
 </style>
 </head>
 <body>
@@ -504,8 +505,8 @@ const MIN_G = 2, MAX_G = 20;
 const MAX_LV = 3;
 const DEFAULT_CFG = {cash:2000, levels:3, rewards:[100,200,300], qTime:60, mTime:90};
 /* مستويان أو ثلاثة، وتسميتها بحسب الصعوبة تلقائيًا مع لون لكل مستوى */
-const LV_NAMES = {2:["سهل","صعب"], 3:["سهل","متوسط","صعب"]};
-const LV_CLS = {2:["easy","hard"], 3:["easy","mid","hard"]};
+const LV_NAMES = {1:["سؤال"], 2:["سهل","صعب"], 3:["سهل","متوسط","صعب"]};
+const LV_CLS = {1:["one"], 2:["easy","hard"], 3:["easy","mid","hard"]};
 const lvName = (n,i) => (LV_NAMES[n]||[])[i] || "المستوى "+(i+1);
 const lvCls = (n,i) => (LV_CLS[n]||[])[i] || "mid";
 const COMPANIES = [
@@ -798,7 +799,7 @@ function renderSetup(){
     <h3 class="sec">الرصيد والمكافآت</h3>
     <div class="cfg-grid">
       <label class="fld"><span>الرصيد الافتتاحي (ريال)</span><input id="cCash" class="num" type="number" min="100" step="100" inputmode="numeric" value="${c.cash}"></label>
-      <div class="fld wide"><span>عدد مستويات الأسئلة</span><div class="seg" id="lSeg"><button data-n="2">مستويان</button><button data-n="3">ثلاثة مستويات</button></div></div>
+      <div class="fld wide"><span>عدد مستويات الأسئلة</span><div class="seg" id="lSeg"><button data-n="1">مستوى واحد</button><button data-n="2">مستويان</button><button data-n="3">ثلاثة مستويات</button></div></div>
     </div>
     <p class="sub">المبلغ الممنوح عن كل إجابة صحيحة في كل مستوى (ريال)</p>
     <div class="cfg-grid" id="lvGrid">${rewardFields()}</div>
@@ -827,7 +828,7 @@ function renderSetup(){
   const setCount = v => { UI.setupCount = clamp(Math.floor(+v)||MIN_G, MIN_G, MAX_G); refreshNames(); };
   const bindRewards = () => app.querySelectorAll("#lvGrid input").forEach(inp => inp.oninput = e => UI.cfg.rewards[+e.target.dataset.lv] = Math.floor(+e.target.value)||0);
   const setLevels = v => {
-    UI.cfg.levels = v===2 ? 2 : 3;
+    UI.cfg.levels = [1,2,3].includes(v) ? v : 3;
     app.querySelectorAll("#lSeg button").forEach(b => b.classList.toggle("on", +b.dataset.n===UI.cfg.levels));
     app.querySelector("#lvGrid").innerHTML = rewardFields(); bindRewards();
   };
@@ -921,6 +922,7 @@ function stageQuestion(){
   const t = curTeam(), c = S.cfg, lv = S.qLevel;
   const head = `${metaLine()}${orderStrip()}<div class="team-name">${esc(t.name)}</div>`;
   const bal = `<div><div class="bal-label">الرصيد الحالي</div><div class="bal"><span class="num">${fmt(wealth(t))}</span>${RIYAL}</div></div>`;
+  if(lv==null && c.levels===1){ S.qLevel = 0; save(); if(c.qTime) curTimer("q"); return stageQuestion(); }
   if(lv==null){
     const btns = c.rewards.map((amt,i)=>`<button class="lvbtn ${lvCls(c.levels,i)}" data-lv="${i}"><span class="ln">${lvName(c.levels,i)}</span><span class="la">+<span class="num">${fmt(amt)}</span> <small>ريال</small></span></button>`).join("");
     return `${head}<div class="qrow">${bal}</div>
@@ -929,7 +931,7 @@ function stageQuestion(){
   }
   const expired = !!(c.qTime && curTimer("q").expired);
   return `${head}
-    <div class="qrow">${bal}<div class="lvchip ${lvCls(c.levels,lv)}">${lvName(c.levels,lv)} • +<span class="num">${fmt(c.rewards[lv])}</span> ريال</div></div>
+    <div class="qrow">${bal}<div class="lvchip ${lvCls(c.levels,lv)}">${c.levels===1?"المكافأة":lvName(c.levels,lv)} • +<span class="num">${fmt(c.rewards[lv])}</span> ريال</div></div>
     ${timerHtml("q")}
     <div class="answer-btns two">
       <button class="abtn ok" id="aOk" ${expired?"disabled":""}><i>✓</i> إجابة صحيحة</button>
@@ -946,7 +948,7 @@ function stageReward(){
   return `${metaLine()}${orderStrip()}
     <div class="team-name" style="font-size:clamp(2rem,4vw,3rem)">${esc(t.name)}</div>
     <div class="reward">
-      <div class="label">${r.correct?`مكافأة سؤال ${lvName(S.cfg.levels, r.level-1)}`:"إجابة خاطئة"}</div>
+      <div class="label">${r.correct?`${S.cfg.levels===1?"مكافأة الإجابة الصحيحة":"مكافأة سؤال "+lvName(S.cfg.levels, r.level-1)}`:"إجابة خاطئة"}</div>
       ${amtHtml}
       <div class="newbal">الرصيد الآن: <b class="num" id="rBal">${fmt(anim ? wealth(t)-r.amt : wealth(t))}</b> ريال</div>
     </div>
